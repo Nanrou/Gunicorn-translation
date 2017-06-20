@@ -124,5 +124,93 @@ Gunicorn v19版本在`REMOTE_ADDR`的处理方法方面有了重大突破，在�
 
 ## Monitoring
 
+***
 
+注意事项
 
+使用以下的监控服务时是不能开启Gunicorn的守护进程模式。这些监控程序******。守护进程会
+
+### Gaffer
+
+#### Using Gafferd and gaffer
+
+可以用Gaffer来监控Gunicorn，简单的配置例子如下：
+
+```bash
+[process:gunicorn]
+cmd = gunicorn -w 3 test:app
+cwd =/path/to/project
+```
+
+#### Using a Procfile
+
+在project中创建一个Procfile
+
+```shell
+gunicorn = gunicron -w 3 test:app
+```
+
+这样的话就可以同时运行其他应用
+
+通过`gaffer start`来启动应用
+
+也可以通过`gaffer load`来直接热载入Procfile
+
+### Runit
+
+也可以用`runit`这个执行监控
+
+```shell
+#! /bin/sh
+
+GUNICORN = /usr/local/bin/gunicorn
+ROOT = /path/to/project
+PID = /var/run/gunicorn.pid
+
+app = main:application
+
+if [-f $PID ]; then rm $PID; fi
+
+cd $ROOT
+exec $GUNICORN -c $ROOT/gunicorn.conf.py --pid=$PID $APP
+```
+
+把这个配置文件保存为`/etc/sv/[app_name]/run`，然后`chmod u+x /etc/sv/[app_name]/run`更改权限，接着创建软接连到`ln -s /etc/sv[app_name] /etc/service/[app_name]`。如果已经好安装`runit`，那么Gunicorn就会在创建好连接后自动运行。
+
+如果Gunicorn没有自动启动，那么就要去用troubleshoot来检查了。
+
+### Supervisor
+
+`Supervisor`也是一个非常好的监控，是用python写的，不过不支持python3。
+
+简单的配置文件例子如下：
+
+```shell
+[program:gunicorn]
+command = /path/to/gunicorn main:application -c /path/to/gunicorn.conf.py
+directory = /path/to/project
+user = nobody
+autostart = true
+autorestart = true
+redirect_stderr = true
+```
+
+#### Upstart
+
+/etc/init/myapp.conf:
+
+```shell
+description `myapp`
+
+start on (filesystem)
+stop on runlevel [016]
+
+respawn 
+setuid nobody
+setgid nogroup
+chdir /path/to/app/directory
+
+exec /path/to/virtualenv/bin/gunicorn myapp:app
+```
+
+这个配置例子里，我们运行了`myapp`这个在虚拟环境中的应用，然后所有错误日志会输出到`var/log/upstart/myapp.log`（什么时候指定的。。。）
